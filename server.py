@@ -28,7 +28,6 @@ def saveLog():
         time.sleep(10) 
         if(log):
             print("Saving Log...")
-            print(log)
             with open("server.log", "w+") as logfile:
                 for item in log:
                     logfile.write("%s\n" % item.decode("utf8"))
