@@ -11,7 +11,12 @@ import signal
 import audioFile
 
 index = None
-
+sounds = {
+    "1" : "fanfare2.wav",
+    "2" : "fanfare.wav",
+    "4" : "receive.wav",
+    "8" : "receiveQ.wav"
+}
 def sigterm_handler(_signo, _stack_frame):
     print("Exiting...")
     client_socket.send(bytes("!quit","utf8"))
@@ -89,9 +94,12 @@ def treeview_sort_column(tv, col, reverse):
                command=lambda: treeview_sort_column(tv, col, not reverse))
 
 def playSound(file):
-    #a = audioFile.AudioFile(file)
-    #a.playclose()
-    pass
+    a = audioFile.AudioFile(file)
+    a.playclose()
+
+def playSelectedSound(number):
+    sound_thread = Thread(target=playSound, args=(["src/audio/{}".format(sounds[number])]), kwargs={})
+    sound_thread.start()
 
 def receive():
     """Handles receiving of messages."""
@@ -112,11 +120,10 @@ def handleReceive(msg):
     if(data[1].startswith("!rm")):
         removeItembyDate(data[1].split(" ")[1])
     else:
-        if(int(data[1])<4):
-            sound_thread = Thread(target=playSound, args=(["src/audio/receive.wav"]), kwargs={})
-            sound_thread.start()
-            if(int(data[1])<2):
-                top.lift()  
+        if(int(data[1])<9):
+            playSelectedSound(data[1])
+            if(int(data[1])==1):
+                top.lift()
                 messagebox.showinfo("Neue wichtige Aufgabe", data[2])
         tree.insert('', 'end', values=data)
     treeview_sort_column(tree,"Prio", False)
@@ -126,7 +133,7 @@ def send(event=None, prefix=9):  # event is passed by binders.
     msg = my_msg.get()
     if(msg):
         my_msg.set("")  # Clears input field.
-        client_socket.send(bytes(str(prefix)+"||"+msg+"&&", "utf8"))
+        client_socket.send(bytes(str(prefix)+"||"+msg.replace("&&","&").replace("||","|")+"&&", "utf8"))
         if "!quit" in msg:
             quitHandler()
 
