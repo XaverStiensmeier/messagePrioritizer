@@ -7,8 +7,17 @@ from tkinter import ttk
 from tkinter import messagebox
 import sys
 import time
-from playsound import playsound
+import signal
+import audioFile
+
 index = None
+
+def sigterm_handler(_signo, _stack_frame):
+    print("Exiting...")
+    client_socket.send(bytes("!quit","utf8"))
+    quitHandler()
+signal.signal(signal.SIGTERM, sigterm_handler)
+signal.signal(signal.SIGINT, sigterm_handler)
 
 def quitHandler():
     top.destroy()
@@ -89,17 +98,22 @@ def receive():
                 removeItembyDate(data[1].split(" ")[1])
             else:
                 if(int(data[1])<4):
-                    playsound('src/audio/receive.wav')
+                    # Usage example for pyaudio
+                    a = audioFile.AudioFile("src/audio/receive.wav")
+                    a.play()
+                    a.close()
                     if(int(data[1])<2):
                         top.lift()
                         messagebox.showinfo("Neue wichtige Aufgabe", data[2])
                 tree.insert('', 'end', values=data)
                 treeview_sort_column(tree,"Prio", False)
         except (OSError, IndexError) as e:  # Possibly client has left the chat.
-            print(e)
+            print("No connection... (OS or IndexError)")
             quitHandler()
         except tkinter.TclError as e:
-            print(e)
+            print("No connection... (TclError)")
+        except ValueError as e:
+            print("No connection... (Value Error)")
 
 
 def send(event=None, prefix=9):  # event is passed by binders.

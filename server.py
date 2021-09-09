@@ -5,12 +5,14 @@ from threading import Thread
 from datetime import datetime
 import time
 import signal
+import sys
 
 def sigterm_handler(_signo, _stack_frame):
+    print("Exiting...")
     SERVER.close()
     sys.exit(0)
 signal.signal(signal.SIGTERM, sigterm_handler)
-
+signal.signal(signal.SIGINT, sigterm_handler)
 global log
 log = []
 
@@ -25,7 +27,7 @@ def accept_incoming_connections():
 def saveLog():
     global log
     while(True):
-        time.sleep(10) 
+        time.sleep(3600) 
         if(log):
             print("Saving Log...")
             with open("server.log", "w+") as logfile:
@@ -40,7 +42,7 @@ def handle_client(client):  # Takes client socket as argument.
     name = client.recv(BUFSIZ).decode("utf8").lstrip(",|1234567890")
     clients[client] = name
     for elem in log:
-        time.sleep(0.01)
+        time.sleep(0.1)
         client.send(bytes(elem))
 
     while True:
@@ -59,10 +61,13 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
     """Broadcasts a message to all the clients."""
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S.%f")
-    for sock in clients:
-        sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
-    log.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
-   
+    try:
+        for sock in clients:
+            sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
+        log.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
+    except BrokenPipeError:
+        print("BrokenPipe.. This probably shouldn't have happened...")
+
 clients = {}
 addresses = {}
 
