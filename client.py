@@ -35,7 +35,7 @@ def removeItem(event):
     try:
         index = tree.selection()[0]
         date = tree.item(index)['values'][3]
-        client_socket.send(bytes("!rm {}".format(date), "utf8"))
+        client_socket.send(bytes("!rm {}&&".format(date), "utf8"))
     except IndexError:
         pass
 
@@ -88,40 +88,45 @@ def treeview_sort_column(tv, col, reverse):
     tv.heading(col,
                command=lambda: treeview_sort_column(tv, col, not reverse))
 
+def playSound(file):
+    #a = audioFile.AudioFile(file)
+    #a.playclose()
+    pass
+
 def receive():
     """Handles receiving of messages."""
     while True:
         try:
-            msg = client_socket.recv(BUFSIZ).decode("utf8")
-            data = msg.split("||")
-            if(data[1].startswith("!rm")):
-                removeItembyDate(data[1].split(" ")[1])
-            else:
-                if(int(data[1])<4):
-                    # Usage example for pyaudio
-                    a = audioFile.AudioFile("src/audio/receive.wav")
-                    a.play()
-                    a.close()
-                    if(int(data[1])<2):
-                        top.lift()
-                        messagebox.showinfo("Neue wichtige Aufgabe", data[2])
-                tree.insert('', 'end', values=data)
-                treeview_sort_column(tree,"Prio", False)
+            msgs = client_socket.recv(BUFSIZ).decode("utf8")
+            msgs = list(filter(None,msgs.split("&&")))
+            for msg in msgs:
+                handleReceive(msg)
         except (OSError, IndexError) as e:  # Possibly client has left the chat.
             print("No connection... (OS or IndexError)")
             quitHandler()
         except tkinter.TclError as e:
             print("No connection... (TclError)")
-        except ValueError as e:
-            print("No connection... (Value Error)")
 
+def handleReceive(msg):
+    data = msg.split("||")
+    if(data[1].startswith("!rm")):
+        removeItembyDate(data[1].split(" ")[1])
+    else:
+        if(int(data[1])<4):
+            sound_thread = Thread(target=playSound, args=(["src/audio/receive.wav"]), kwargs={})
+            sound_thread.start()
+            if(int(data[1])<2):
+                top.lift()  
+                messagebox.showinfo("Neue wichtige Aufgabe", data[2])
+        tree.insert('', 'end', values=data)
+    treeview_sort_column(tree,"Prio", False)
 
 def send(event=None, prefix=9):  # event is passed by binders.
     """Handles sending of messages."""
     msg = my_msg.get()
     if(msg):
         my_msg.set("")  # Clears input field.
-        client_socket.send(bytes(str(prefix)+"||"+msg, "utf8"))
+        client_socket.send(bytes(str(prefix)+"||"+msg+"&&", "utf8"))
         if "!quit" in msg:
             quitHandler()
 
@@ -187,9 +192,9 @@ client_socket.connect(ADDR)
 client_socket.send(bytes(NAME, "utf8"))
 try:
     if(RECALLER):
-        th = Thread(target=recaller)
-        th.setDaemon(True)
-        th.start()
+        recaller_thread = Thread(target=recaller)
+        recaller_thread.setDaemon(True)
+        recaller_thread.start()
 
     receive_thread = Thread(target=receive)
     receive_thread.setDaemon(True)

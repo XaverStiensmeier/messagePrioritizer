@@ -28,3 +28,7 @@ class AudioFile:
         """ Graceful shutdown """ 
         self.stream.close()
         self.p.terminate()
+
+    def playclose(self):
+        self.play()
+        self.close()

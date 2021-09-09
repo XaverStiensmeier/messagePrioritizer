@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Server for multithreaded (asynchronous) chat application."""
-from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, TCP_NODELAY
 from threading import Thread
 from datetime import datetime
 import time
@@ -15,6 +15,7 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
 global log
 log = []
+active = []
 
 def accept_incoming_connections():
     """Sets up handling for incoming clients."""
@@ -27,7 +28,7 @@ def accept_incoming_connections():
 def saveLog():
     global log
     while(True):
-        time.sleep(3600) 
+        time.sleep(600) 
         if(log):
             print("Saving Log...")
             with open("server.log", "w+") as logfile:
@@ -41,20 +42,24 @@ def handle_client(client):  # Takes client socket as argument.
 
     name = client.recv(BUFSIZ).decode("utf8").lstrip(",|1234567890")
     clients[client] = name
-    for elem in log:
-        time.sleep(0.1)
+    for elem in active:
+        print(elem)
         client.send(bytes(elem))
 
     while True:
-        msg = client.recv(BUFSIZ)
-        if not bytes("!quit", "utf8") in msg:
-            broadcast(msg, name)
-        else:
-            client.send(bytes("!quit", "utf8"))
-            client.close()
-            del clients[client]
-            print("%s has left the chat." % name)
-            break
+        msgsraw = client.recv(BUFSIZ)
+        print(msgsraw)
+        msgs = filter(None,msgsraw.decode("utf8").split("&&"))
+        for msg in msgs:
+            msg = bytes(msg, "utf8")
+            if not bytes("!quit", "utf8") in msg:
+                broadcast(msg, name)
+            else:
+                client.send(bytes("!quit", "utf8"))
+                client.close()
+                del clients[client]
+                print("%s has left the chat." % name)
+                break
 
 
 def broadcast(msg, prefix=""):  # prefix is for name identification.
@@ -63,10 +68,18 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
     current_time = now.strftime("%H:%M:%S.%f")
     try:
         for sock in clients:
-            sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
+            sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
         log.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
+        smsg = msg.decode("utf8")
+        if(smsg.startswith("!rm")):
+            smsgdate = smsg.split(" ")[1]
+            [active.remove(elem) for elem in active if smsgdate+"&&" == elem.decode("utf8").split("||")[3]]
+        else:
+            active.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
+        print(active)
     except BrokenPipeError:
-        print("BrokenPipe.. This probably shouldn't have happened...")
+        #print("BrokenPipe.. This probably shouldn't have happened...")
+        pass
 
 clients = {}
 addresses = {}
