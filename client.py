@@ -19,14 +19,22 @@ sounds = {
     "4" : "receive.wav",
     "8" : "receiveQ.wav"
 }
+global counter
+counter = 0
 def sigterm_handler(_signo, _stack_frame):
+    global counter
     print("Exiting...")
-    client_socket.send(bytes("!quit","utf8"))
-    quitHandler()
+    if(counter):
+        quitExecutor()
+    else:
+        counter +=1
+        quitHandler()
 signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
 
 def quitHandler():
+    client_socket.send(bytes("!quit","utf8"))
+def quitExecutor():
     top.destroy()
     client_socket.close()
     sys.exit(0)
@@ -118,7 +126,7 @@ def receive():
                 handleReceive(msg)
         except (OSError, IndexError) as e:  # Possibly client has left the chat.
             print("No connection... (OS or IndexError)")
-            quitHandler()
+            quitExecutor()
         except tkinter.TclError as e:
             print("No connection... (TclError)")
 
@@ -126,6 +134,8 @@ def handleReceive(msg):
     data = msg.split("||")
     if(data[1].startswith("!rm")):
         removeItembyDate(data[1].split(" ")[1])
+    elif("quit!" in data[1]):
+        quitExecutor()
     else:
         if(int(data[1])<9):
             playSelectedSound(data[1])
@@ -143,15 +153,10 @@ def send(event=None, prefix=9):  # event is passed by binders.
     if(msg):
         my_msg.set("")  # Clears input field.
         client_socket.send(bytes(str(prefix)+"||"+msg.replace("&&","&").replace("||","|")+"&&", "utf8"))
-        if "!quit" in msg:
-            quitHandler()
-
 
 def on_closing(event=None):
     """This function is to be called when the window is closed."""
     if messagebox.askokcancel("Beenden", "Bist du sicher, dass du das Programm beenden möchtest?"):
-        my_msg.set("!quit")
-        send()
         quitHandler()
 
 top = tkinter.Tk()

@@ -45,7 +45,6 @@ def handle_client(client):  # Takes client socket as argument.
     clients[client] = name
     for elem in active:
         client.send(bytes(elem))
-
     while True:
         msgsraw = client.recv(BUFSIZ)
         msgs = filter(None,msgsraw.decode("utf8").split("&&"))
@@ -69,7 +68,6 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
     """Broadcasts a message to all the clients."""
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S.%f")
-    print(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
     try:
         for sock in clients:
             sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
