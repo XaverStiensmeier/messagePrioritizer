@@ -126,6 +126,7 @@ def receive():
                 handleReceive(msg)
         except (OSError, IndexError) as e:  # Possibly client has left the chat.
             print("No connection... (OS or IndexError)")
+            print(e)
             quitExecutor()
         except tkinter.TclError as e:
             print("No connection... (TclError)")
