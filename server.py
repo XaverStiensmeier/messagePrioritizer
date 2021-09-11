@@ -13,6 +13,7 @@ def sigterm_handler(_signo, _stack_frame):
     sys.exit(0)
 signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
+
 global log
 log = []
 active = []
@@ -43,29 +44,32 @@ def handle_client(client):  # Takes client socket as argument.
     name = client.recv(BUFSIZ).decode("utf8").lstrip(",|1234567890")
     clients[client] = name
     for elem in active:
-        print(elem)
         client.send(bytes(elem))
 
     while True:
         msgsraw = client.recv(BUFSIZ)
-        print(msgsraw)
         msgs = filter(None,msgsraw.decode("utf8").split("&&"))
         for msg in msgs:
             msg = bytes(msg, "utf8")
             if not bytes("!quit", "utf8") in msg:
                 broadcast(msg, name)
             else:
-                client.send(bytes("!quit", "utf8"))
-                client.close()
-                del clients[client]
-                print("%s has left the chat." % name)
-                break
+                try:
+                    client.send(bytes("!quit", "utf8"))
+                    del clients[client]
+                    client.close()
+                    print("%s has left the chat." % name)
+                    sys.exit(0)
+                except ConnectionResetError as e:
+                    print(e)
+                    sys.exit(0)
 
 
 def broadcast(msg, prefix=""):  # prefix is for name identification.
     """Broadcasts a message to all the clients."""
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S.%f")
+    print(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
     try:
         for sock in clients:
             sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
@@ -76,7 +80,7 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
             [active.remove(elem) for elem in active if smsgdate+"&&" == elem.decode("utf8").split("||")[3]]
         else:
             active.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
-        print(active)
+        print(len(active))
     except BrokenPipeError:
         #print("BrokenPipe.. This probably shouldn't have happened...")
         pass

@@ -9,9 +9,11 @@ import sys
 import time
 import signal
 import audioFile
-
+global sound_thread
+sound_thread = None
 index = None
 sounds = {
+    "-1": "oc.wav",
     "1" : "fanfare2.wav",
     "2" : "fanfare.wav",
     "4" : "receive.wav",
@@ -47,6 +49,7 @@ def removeItem(event):
 def removeItembyIndex(index):
     try:
         tree.delete(index)
+        playSelectedSound("-1")
     except IndexError:
         pass
 
@@ -98,9 +101,13 @@ def playSound(file):
     a.playclose()
 
 def playSelectedSound(number):
-    sound_thread = Thread(target=playSound, args=(["src/audio/{}".format(sounds[number])]), kwargs={})
-    sound_thread.start()
+    global sound_thread
+    if(not sound_thread or not sound_thread.is_alive()):
+        sound_thread = Thread(target=playSound, args=(["src/audio/{}".format(sounds[number])]), kwargs={})
+        sound_thread.start()
 
+def showMessagebox(text):
+    messagebox.showinfo("Neue wichtige Aufgabe", text)
 def receive():
     """Handles receiving of messages."""
     while True:
@@ -124,7 +131,9 @@ def handleReceive(msg):
             playSelectedSound(data[1])
             if(int(data[1])==1):
                 top.lift()
-                messagebox.showinfo("Neue wichtige Aufgabe", data[2])
+                showMessagebox(data[2])
+                #text_thread = Thread(target=showMessagebox, args=([data[2]]), kwargs={})
+                #text_thread.start()
         tree.insert('', 'end', values=data)
     treeview_sort_column(tree,"Prio", False)
 
@@ -140,9 +149,10 @@ def send(event=None, prefix=9):  # event is passed by binders.
 
 def on_closing(event=None):
     """This function is to be called when the window is closed."""
-    my_msg.set("!quit")
-    send()
-    quitHandler()
+    if messagebox.askokcancel("Beenden", "Bist du sicher, dass du das Programm beenden möchtest?"):
+        my_msg.set("!quit")
+        send()
+        quitHandler()
 
 top = tkinter.Tk()
 top.title("Priorime")
