@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Script for Tkinter GUI chat client."""
-from socket import AF_INET, socket, SOCK_STREAM
+from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_KEEPALIVE
 from threading import Thread
 import tkinter
 from tkinter import ttk
@@ -211,16 +211,15 @@ BUFSIZ = 1024
 ADDR = (HOST, PORT)
 
 client_socket = socket(AF_INET, SOCK_STREAM)
+client_socket.setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1)
 client_socket.connect(ADDR)
 client_socket.send(bytes(NAME, "utf8"))
 try:
     if(RECALLER):
-        recaller_thread = Thread(target=recaller)
-        recaller_thread.setDaemon(True)
+        recaller_thread = Thread(target=recaller, daemon=True)
         recaller_thread.start()
 
-    receive_thread = Thread(target=receive)
-    receive_thread.setDaemon(True)
+    receive_thread = Thread(target=receive, daemon=True)
     receive_thread.start()
 except (KeyboardInterrupt, SystemExit):
     cleanup_stop_thread()

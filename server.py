@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Server for multithreaded (asynchronous) chat application."""
-from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, TCP_NODELAY
+from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, TCP_NODELAY, SO_KEEPALIVE
 from threading import Thread
 from datetime import datetime
 import time
@@ -93,15 +93,14 @@ ADDR = (HOST, PORT)
 
 SERVER = socket(AF_INET, SOCK_STREAM)
 SERVER.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+SERVER.setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1)
 SERVER.bind(ADDR)
 if __name__ == "__main__":
     SERVER.listen(5)
     print("Waiting for connection...")
-    ACCEPT_THREAD = Thread(target=accept_incoming_connections)
-    saveLog_THREAD = Thread(target= saveLog)
-    saveLog_THREAD.setDaemon(True)
+    ACCEPT_THREAD = Thread(target=accept_incoming_connections, daemon=True)
+    saveLog_THREAD = Thread(target= saveLog, daemon=True)
     saveLog_THREAD.start()
-    ACCEPT_THREAD.setDaemon(True)
     ACCEPT_THREAD.start()
     ACCEPT_THREAD.join()
     SERVER.close()
