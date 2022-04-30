@@ -79,8 +79,9 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
         else:
             active.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
         print(len(active))
-    except BrokenPipeError:
+    except BrokenPipeError as e:
         #print("BrokenPipe.. This probably shouldn't have happened...")
+        print(e)
         pass
 
 clients = {}

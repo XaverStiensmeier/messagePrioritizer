@@ -9,6 +9,8 @@ import sys
 import time
 import signal
 import audioFile
+import playsound
+
 global sound_thread
 sound_thread = None
 index = None
@@ -39,27 +41,20 @@ def quitExecutor():
     client_socket.close()
     sys.exit(0)
 
-def getHighPrio():
-    allIndizes = tree.get_children()
-    allChildren = []
-    for indize in allIndizes:
-        allChildren.append(tree.item(indize)['values'])
-    return min(allChildren, key = lambda t: t[1])
-
 def removeItem(event):
     try:
         index = tree.selection()[0]
         date = tree.item(index)['values'][3]
         client_socket.send(bytes("!rm {}&&".format(date), "utf8"))
-    except IndexError:
-        pass
+    except IndexError as e:
+        print("removeItem",e)
 
 def removeItembyIndex(index):
     try:
         tree.delete(index)
         playSelectedSound("-1")
-    except IndexError:
-        pass
+    except IndexError as e:
+        print(e)
 
 def removeItembyDate(date):
     allIndizes = tree.get_children()
@@ -72,19 +67,15 @@ def recaller():
     global index
     while(True):
         print("Recalling...")
-        waiter = 300
         priority = 1
         if(tree.get_children()):
-            try:
-                name,priority,content = getHighPrio()
-                if(priority<8):
-                    messagebox.showwarning("Aufgabe", name+": "+content+"\nPriorität: "+str(priority))
-                else:
-                    priority=1
-            except (IndexError,tkinter.TclError) as e:
-                priority = 9
-                pass
-        time.sleep(waiter*priority)
+            child = tree.get_children()[0]
+            if(priority<8):
+                name, priority, content, date = tree.item(child)["values"]
+                messagebox.showwarning("Recall", f"{name}: {content}\nFrom: {date[:5]} with Priority: {priority}!")
+            else:
+                priority=1
+        time.sleep(RECALLER*priority)
 
 def select_entry(event):
     global index
@@ -92,8 +83,12 @@ def select_entry(event):
         index = tree.selection()[0]
         content = tree.item(index)['values'][2]
         messagebox.showinfo("Aufgabe", content)
-    except IndexError:
-        pass
+    except IndexError as e:
+        children = tree.get_children()
+        if children:
+            child_id = children[0]
+            tree.focus(child_id)
+            tree.selection_set(child_id)
 
 #https://stackoverflow.com/questions/1966929/tk-treeview-column-sort
 def treeview_sort_column(tv, col, reverse):
@@ -104,14 +99,18 @@ def treeview_sort_column(tv, col, reverse):
     tv.heading(col,
                command=lambda: treeview_sort_column(tv, col, not reverse))
 
-def playSound(file):
-    a = audioFile.AudioFile(file)
-    a.playclose()
+def play_audio(file):
+    #a = audioFile.AudioFile(file)
+    #a.playclose()
+    try:
+        playsound.playsound(file)
+    except playsound.PlaysoundException:
+        playsound.playsound("src/audio/receive.wav")
 
 def playSelectedSound(number):
     global sound_thread
     if(not sound_thread or not sound_thread.is_alive()):
-        sound_thread = Thread(target=playSound, args=(["src/audio/{}".format(sounds[number])]), kwargs={})
+        sound_thread = Thread(target=play_audio, args=(["src/audio/{}".format(sounds[number])]), kwargs={})
         sound_thread.start()
 
 def showMessagebox(text):
@@ -124,12 +123,11 @@ def receive():
             msgs = list(filter(None,msgs.split("&&")))
             for msg in msgs:
                 handleReceive(msg)
-        except (OSError, IndexError) as e:  # Possibly client has left the chat.
-            print("No connection... (OS or IndexError)")
-            print(e)
+        except IndexError as e:  # Possibly client has left the chat.
+            print("You have left the chat.")
             quitExecutor()
         except tkinter.TclError as e:
-            print("No connection... (TclError)")
+            print("receive",e)
 
 def handleReceive(msg):
     data = msg.split("||")
@@ -198,7 +196,7 @@ top.protocol("WM_DELETE_WINDOW", on_closing)
 with open("client.conf", "r") as client:
     HOST,PORT = client.readline().strip("\n").split(",")
     NAME = client.readline().strip("\n")
-    RECALLER = not int(client.readline().strip("\n")) == 0
+    RECALLER = int(client.readline().strip("\n"))
 if(not HOST):
     HOST = input('Enter host: ')
 if(not PORT):
@@ -214,14 +212,10 @@ client_socket = socket(AF_INET, SOCK_STREAM)
 client_socket.setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1)
 client_socket.connect(ADDR)
 client_socket.send(bytes(NAME, "utf8"))
-try:
-    if(RECALLER):
-        recaller_thread = Thread(target=recaller, daemon=True)
-        recaller_thread.start()
+if(RECALLER):
+    recaller_thread = Thread(target=recaller, daemon=True)
+    recaller_thread.start()
 
-    receive_thread = Thread(target=receive, daemon=True)
-    receive_thread.start()
-except (KeyboardInterrupt, SystemExit):
-    cleanup_stop_thread()
-    sys.exit()
+receive_thread = Thread(target=receive, daemon=True)
+receive_thread.start()
 tkinter.mainloop()  # Starts GUI execution.

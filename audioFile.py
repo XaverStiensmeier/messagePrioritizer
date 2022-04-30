@@ -7,8 +7,11 @@ class AudioFile:
     chunk = 1024
 
     def __init__(self, file):
-        """ Init audio stream """ 
-        self.wf = wave.open(file, 'rb')
+        """ Init audio stream """
+        try:
+            self.wf = wave.open(file, 'rb')
+        except FileNotFoundError:
+            self.wf = wave.open("src/audio/receive.wav", 'rb')
         self.p = pyaudio.PyAudio()
         self.stream = self.p.open(
             format = self.p.get_format_from_width(self.wf.getsampwidth()),
@@ -19,6 +22,7 @@ class AudioFile:
 
     def play(self):
         """ Play entire file """
+        print("Playing sound", self.wf)
         data = self.wf.readframes(self.chunk)
         while data != b'':
             self.stream.write(data)
