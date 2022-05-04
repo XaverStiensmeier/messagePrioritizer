@@ -3,8 +3,7 @@
 from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_KEEPALIVE
 from threading import Thread
 import tkinter
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import ttk, messagebox, Toplevel, Frame, Label, CENTER
 import sys
 import time
 import signal
@@ -41,6 +40,28 @@ def quitExecutor():
     client_socket.close()
     sys.exit(0)
 
+def popup(title="", text=""):
+    # Create an instance of window
+    win=Toplevel()
+
+    # Set the geometry of the window
+    win.geometry("700x350")
+
+    # Create a frame widget
+    frame=Frame(win, width=300, height=300)
+    frame.grid(row=0, column=0, sticky="NW")
+
+    # Create a label widget 
+    label_title=Label(win, text=title, font='Arial 17 bold', wraplengt=650)
+    label_title.place(relx=0.5, rely=0.1, anchor=CENTER)
+    label_text=Label(win, text=text, font='Arial 15', wraplengt=650)
+    label_text.place(relx=0.5, rely=0.23, anchor=CENTER)
+    style = ttk.Style()
+    style.configure("BW.GreenButton", background="green")
+    b = tkinter.Button(win, text="Okay", width=25, font="Arial 15", command=win.destroy, bg="#00FF00")
+    b.place(relx=0.5, rely=0.85, anchor=CENTER)
+    win.bind("<Return>", lambda event: win.destroy())
+
 def removeItem(event):
     try:
         index = tree.selection()[0]
@@ -63,26 +84,21 @@ def removeItembyDate(date):
         if(tree.item(indize)['values'][3] == date):
             removeItembyIndex(indize)
 
-def recaller():
-    global index
-    while(True):
-        print("Recalling...")
-        priority = 1
-        if(tree.get_children()):
-            child = tree.get_children()[0]
-            if(priority<8):
-                name, priority, content, date = tree.item(child)["values"]
-                messagebox.showwarning("Recall", f"{name}: {content}\nFrom: {date[:5]} with Priority: {priority}!")
-            else:
-                priority=1
-        time.sleep(RECALLER*priority)
+def recaller(name,prio,text,date,ind):
+    while(ind in tree.get_children()):
+        time.sleep(int(prio)*RECALLER)
+        if ind in tree.get_children():
+            popup("Recaller", f"Wer: {name}\nPriorität: {prio}\nAufgabe: {text}\nDate: {date[:5]}")
 
 def select_entry(event):
+    extend_item(event)
+
+def extend_item(event):
     global index
     try:
         index = tree.selection()[0]
         content = tree.item(index)['values'][2]
-        messagebox.showinfo("Aufgabe", content)
+        popup("Aufgabe", content)
     except IndexError as e:
         children = tree.get_children()
         if children:
@@ -102,10 +118,11 @@ def treeview_sort_column(tv, col, reverse):
 def play_audio(file):
     #a = audioFile.AudioFile(file)
     #a.playclose()
-    try:
-        playsound.playsound(file)
-    except playsound.PlaysoundException:
-        playsound.playsound("src/audio/receive.wav")
+    if(RECALLER):
+        try:
+            playsound.playsound(file)
+        except playsound.PlaysoundException:
+            playsound.playsound("src/audio/receive.wav")
 
 def playSelectedSound(number):
     global sound_thread
@@ -113,8 +130,6 @@ def playSelectedSound(number):
         sound_thread = Thread(target=play_audio, args=(["src/audio/{}".format(sounds[number])]), kwargs={})
         sound_thread.start()
 
-def showMessagebox(text):
-    messagebox.showinfo("Neue wichtige Aufgabe", text)
 def receive():
     """Handles receiving of messages."""
     while True:
@@ -136,14 +151,15 @@ def handleReceive(msg):
     elif("quit!" in data[1]):
         quitExecutor()
     else:
+        ind = tree.insert('', 'end', values=data)
         if(int(data[1])<9):
             playSelectedSound(data[1])
-            if(int(data[1])==1):
+            if(int(data[1])==1 and RECALLER):
                 top.lift()
-                showMessagebox(data[2])
-                #text_thread = Thread(target=showMessagebox, args=([data[2]]), kwargs={})
-                #text_thread.start()
-        tree.insert('', 'end', values=data)
+                popup("Wichtige Aufgabe!", data[2])
+        if(RECALLER):
+            recaller_thread = Thread(target=recaller, args=data+[ind], daemon=True)
+            recaller_thread.start()
     treeview_sort_column(tree,"Prio", False)
 
 def send(event=None, prefix=9):  # event is passed by binders.
@@ -160,7 +176,6 @@ def on_closing(event=None):
 
 top = tkinter.Tk()
 top.title("Priorime")
-
 messages_frame = tkinter.Frame(top)
 my_msg = tkinter.StringVar()  # For the messages to be sent.
 scrollbar = tkinter.Scrollbar(messages_frame)  # To navigate through past messages.
@@ -171,12 +186,13 @@ tree.column("Aufgabe", width=300)
 tree.column("Wer", width=50)
 tree.column("Prio", width=50)
 tree.column("Zeit", width=50)
-tree.bind('<<TreeviewSelect>>', select_entry)
+#tree.bind('<<TreeviewSelect>>', select_entry)
 tree.bind('r',removeItem)
+tree.bind('e',extend_item)
 for column in ["Wer", "Prio", "Aufgabe","Zeit"]:
     tree.heading(column, text=column)
-tree.pack(side="left", fill=tkinter.BOTH)
-messages_frame.pack()
+tree.pack(expand="yes", fill=tkinter.BOTH)
+messages_frame.pack(fill='both', expand="yes")
 
 entry_field = tkinter.Entry(top, textvariable=my_msg)
 entry_field.bind("<Return>", send)
@@ -185,10 +201,10 @@ ni_button = tkinter.Button(text="Unwichtig", command=lambda: send(prefix=8))
 ni_button.pack(side="left", fill="both", expand=True)
 med_button = tkinter.Button(text="Medium", command=lambda: send(prefix=4))
 med_button.pack(side="left", fill="both", expand=True)
-vi_button = tkinter.Button(text="Extrem wichtig", command=lambda: send(prefix=1))
-vi_button.pack(side="right", fill="both", expand=True)
 i_button = tkinter.Button(text="Wichtig", command=lambda: send(prefix=2))
-i_button.pack(side="right", fill="both", expand=True)
+i_button.pack(side="left", fill="both", expand=True)
+vi_button = tkinter.Button(text="Extrem wichtig", command=lambda: send(prefix=1))
+vi_button.pack(side="left", fill="both", expand=True)
 
 top.protocol("WM_DELETE_WINDOW", on_closing)
 
@@ -212,10 +228,6 @@ client_socket = socket(AF_INET, SOCK_STREAM)
 client_socket.setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1)
 client_socket.connect(ADDR)
 client_socket.send(bytes(NAME, "utf8"))
-if(RECALLER):
-    recaller_thread = Thread(target=recaller, daemon=True)
-    recaller_thread.start()
-
 receive_thread = Thread(target=receive, daemon=True)
 receive_thread.start()
 tkinter.mainloop()  # Starts GUI execution.

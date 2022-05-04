@@ -6,9 +6,17 @@ from datetime import datetime
 import time
 import signal
 import sys
+import logging
+
+logging.basicConfig(filename="server.log",
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
 
 def sigterm_handler(_signo, _stack_frame):
     print("Exiting...")
+    logging.info("Exited.")
     SERVER.close()
     sys.exit(0)
 signal.signal(signal.SIGTERM, sigterm_handler)
@@ -23,6 +31,7 @@ def accept_incoming_connections():
     while True:
         client, client_address = SERVER.accept()
         print("%s:%s has connected." % client_address)
+        logging.info("%s:%s has connected." % client_address)
         addresses[client] = client_address
         Thread(target=handle_client, args=(client,)).start()
 
@@ -58,6 +67,7 @@ def handle_client(client):  # Takes client socket as argument.
                     del clients[client]
                     client.close()
                     print("%s has left the chat." % name)
+                    logging.info("%s has left the chat." % name)
                     sys.exit(0)
                 except ConnectionResetError as e:
                     print(e)
@@ -72,13 +82,13 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
         for sock in clients:
             sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
         log.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
+        logging.info(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
         smsg = msg.decode("utf8")
         if(smsg.startswith("!rm")):
             smsgdate = smsg.split(" ")[1]
             [active.remove(elem) for elem in active if smsgdate+"&&" == elem.decode("utf8").split("||")[3]]
         else:
             active.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
-        print(len(active))
     except BrokenPipeError as e:
         #print("BrokenPipe.. This probably shouldn't have happened...")
         print(e)
