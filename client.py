@@ -7,7 +7,6 @@ from tkinter import ttk, messagebox, Toplevel, Frame, Label, CENTER
 import sys
 import time
 import signal
-import audioFile
 import playsound
 
 global sound_thread
@@ -15,6 +14,7 @@ sound_thread = None
 index = None
 sounds = {
     "-1": "oc.wav",
+    "0":"reminder.mp3",
     "1" : "fanfare2.wav",
     "2" : "fanfare.wav",
     "4" : "receive.wav",
@@ -25,13 +25,18 @@ counter = 0
 def sigterm_handler(_signo, _stack_frame):
     global counter
     print("Exiting...")
-    if(counter):
-        quitExecutor()
-    else:
-        counter +=1
-        quitHandler()
+    try:
+        if(counter):
+            quitExecutor()
+        else:
+            counter +=1
+            quitHandler()
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
+signal.signal(signal.SIGQUIT, sigterm_handler)
 
 def quitHandler():
     client_socket.send(bytes("!quit","utf8"))
@@ -55,12 +60,14 @@ def popup(title="", text=""):
     label_title=Label(win, text=title, font='Arial 17 bold', wraplengt=650)
     label_title.place(relx=0.5, rely=0.1, anchor=CENTER)
     label_text=Label(win, text=text, font='Arial 15', wraplengt=650)
-    label_text.place(relx=0.5, rely=0.23, anchor=CENTER)
+    label_text.place(relx=0.5, rely=0.4, anchor=CENTER)
     style = ttk.Style()
     style.configure("BW.GreenButton", background="green")
     b = tkinter.Button(win, text="Okay", width=25, font="Arial 15", command=win.destroy, bg="#00FF00")
     b.place(relx=0.5, rely=0.85, anchor=CENTER)
     win.bind("<Return>", lambda event: win.destroy())
+    win.lift()
+    return win
 
 def removeItem(event):
     try:
@@ -85,10 +92,15 @@ def removeItembyDate(date):
             removeItembyIndex(indize)
 
 def recaller(name,prio,text,date,ind):
+    win = None
     while(ind in tree.get_children()):
         time.sleep(int(prio)*RECALLER)
         if ind in tree.get_children():
-            popup("Recaller", f"Wer: {name}\nPriorität: {prio}\nAufgabe: {text}\nDate: {date[:5]}")
+            playSelectedSound("0")
+            if win:
+                win.destroy()
+            win = popup("Recaller", f"Wer: {name}\nPriorität: {prio}\nAufgabe: {text}\nDate: {date[:5]}")
+
 
 def select_entry(event):
     extend_item(event)
@@ -116,8 +128,6 @@ def treeview_sort_column(tv, col, reverse):
                command=lambda: treeview_sort_column(tv, col, not reverse))
 
 def play_audio(file):
-    #a = audioFile.AudioFile(file)
-    #a.playclose()
     if(RECALLER):
         try:
             playsound.playsound(file)
@@ -157,9 +167,9 @@ def handleReceive(msg):
             if(int(data[1])==1 and RECALLER):
                 top.lift()
                 popup("Wichtige Aufgabe!", data[2])
-        if(RECALLER):
-            recaller_thread = Thread(target=recaller, args=data+[ind], daemon=True)
-            recaller_thread.start()
+            if(RECALLER):
+                recaller_thread = Thread(target=recaller, args=data+[ind], daemon=True)
+                recaller_thread.start()
     treeview_sort_column(tree,"Prio", False)
 
 def send(event=None, prefix=9):  # event is passed by binders.
@@ -167,7 +177,7 @@ def send(event=None, prefix=9):  # event is passed by binders.
     msg = my_msg.get()
     if(msg):
         my_msg.set("")  # Clears input field.
-        client_socket.send(bytes(str(prefix)+"||"+msg.replace("&&","&").replace("||","|")+"&&", "utf8"))
+        client_socket.send(bytes(str(prefix)+"||"+msg.replace("&","und").replace("|","oder")+"&&", "utf8"))
 
 def on_closing(event=None):
     """This function is to be called when the window is closed."""

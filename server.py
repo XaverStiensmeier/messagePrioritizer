@@ -21,9 +21,6 @@ def sigterm_handler(_signo, _stack_frame):
     sys.exit(0)
 signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
-
-global log
-log = []
 active = []
 
 def accept_incoming_connections():
@@ -35,20 +32,12 @@ def accept_incoming_connections():
         addresses[client] = client_address
         Thread(target=handle_client, args=(client,)).start()
 
-def saveLog():
-    global log
-    while(True):
-        time.sleep(600) 
-        if(log):
-            print("Saving Log...")
-            with open("server.log", "w+") as logfile:
-                for item in log:
-                    logfile.write("%s\n" % item.decode("utf8"))
-            print("Saved.")
-
 
 def handle_client(client):  # Takes client socket as argument.
-    """Handles a single client connection."""
+    """
+    Handles a single client connection.
+    Active holds all currently non-closed tasks.
+    """
 
     name = client.recv(BUFSIZ).decode("utf8").lstrip(",|1234567890")
     clients[client] = name
@@ -80,8 +69,11 @@ def broadcast(msg, prefix=""):  # prefix is for name identification.
     current_time = now.strftime("%H:%M:%S.%f")
     try:
         for sock in clients:
-            sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
-        log.append(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
+            try:
+                sock.send(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time+"&&", "utf8"))
+            except Exception as e:
+                print("Cut connection with sock. He threw an exception!", e)
+                del clients[sock]
         logging.info(bytes(prefix+"||", "utf8")+msg+bytes("||"+current_time, "utf8"))
         smsg = msg.decode("utf8")
         if(smsg.startswith("!rm")):
@@ -110,8 +102,6 @@ if __name__ == "__main__":
     SERVER.listen(5)
     print("Waiting for connection...")
     ACCEPT_THREAD = Thread(target=accept_incoming_connections, daemon=True)
-    saveLog_THREAD = Thread(target= saveLog, daemon=True)
-    saveLog_THREAD.start()
     ACCEPT_THREAD.start()
     ACCEPT_THREAD.join()
     SERVER.close()
