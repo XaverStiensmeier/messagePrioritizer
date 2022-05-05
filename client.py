@@ -184,6 +184,10 @@ def on_closing(event=None):
     if messagebox.askokcancel("Beenden", "Bist du sicher, dass du das Programm beenden möchtest?"):
         quitHandler()
 
+def selall(ev):
+    ev.widget.event_generate('<<SelectAll>>')
+    return 'break'
+
 top = tkinter.Tk()
 top.title("Priorime")
 messages_frame = tkinter.Frame(top)
@@ -206,6 +210,7 @@ messages_frame.pack(fill='both', expand="yes")
 
 entry_field = tkinter.Entry(top, textvariable=my_msg)
 entry_field.bind("<Return>", send)
+entry_field.bind("<Control-a>", selall)
 entry_field.pack(fill="both")
 ni_button = tkinter.Button(text="Unwichtig", command=lambda: send(prefix=8))
 ni_button.pack(side="left", fill="both", expand=True)
